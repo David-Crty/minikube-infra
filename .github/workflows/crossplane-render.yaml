@@ -1,0 +1,65 @@
+name: Crossplane Render
+
+on:
+  pull_request:
+    paths:
+      - 'helm/crossplane/templates/composition.yaml'
+      - 'helm/crossplane/templates/xrd.yaml'
+      - 'helm/crossplane/templates/fn.yaml'
+      - 'helm/crossplane-resources/**'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Crossplane CLI
+        run: |
+          curl -sL https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh | sh
+          sudo mv crossplane /usr/local/bin/
+          crossplane version
+
+      - name: Create functions file for render
+        run: |
+          cat > /tmp/functions.yaml << 'EOF'
+          apiVersion: pkg.crossplane.io/v1beta1
+          kind: Function
+          metadata:
+            name: crossplane-contrib-function-patch-and-transform
+          spec:
+            package: xpkg.crossplane.io/crossplane-contrib/function-patch-and-transform:v0.8.2
+          EOF
+
+      - name: Render my-app composition
+        run: |
+          echo "=== Rendering my-app.yaml ==="
+          crossplane render \
+            helm/crossplane-resources/templates/my-app.yaml \
+            helm/crossplane/templates/composition.yaml \
+            /tmp/functions.yaml
+
+      - name: Validate render output
+        run: |
+          echo "=== Validating render produces expected resources ==="
+          OUTPUT=$(crossplane render \
+            helm/crossplane-resources/templates/my-app.yaml \
+            helm/crossplane/templates/composition.yaml \
+            /tmp/functions.yaml 2>&1)
+
+          # Check that Deployment is created
+          if echo "$OUTPUT" | grep -q "kind: Deployment"; then
+            echo "✓ Deployment resource found"
+          else
+            echo "✗ Deployment resource missing"
+            exit 1
+          fi
+
+          # Check that Service is created
+          if echo "$OUTPUT" | grep -q "kind: Service"; then
+            echo "✓ Service resource found"
+          else
+            echo "✗ Service resource missing"
+            exit 1
+          fi
