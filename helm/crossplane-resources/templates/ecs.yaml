@@ -1,0 +1,12 @@
+apiVersion: ecs.aws.m.upbound.io/v1beta1
+kind: Cluster
+metadata:
+  annotations:
+    meta.upbound.io/example-id: ecs/v1beta1/service
+  labels:
+    testing.upbound.io/example-name: example-cluster
+  name: test-ecs-cluster
+  namespace: default
+spec:
+  forProvider:
+    region: eu-west-3
